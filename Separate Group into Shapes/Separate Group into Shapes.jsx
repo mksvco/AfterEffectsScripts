@@ -1,7 +1,10 @@
-// Check if a composition is open and there's at least one selected shape layer
-if (app.project.activeItem instanceof CompItem) {
-    var comp = app.project.activeItem;
-    var selectedLayers = comp.selectedLayers;
+(function() {
+    app.beginUndoGroup("Separate Shape Groups");
+
+    // Check if a composition is open and there's at least one selected shape layer
+    if (app.project.activeItem instanceof CompItem) {
+        var comp = app.project.activeItem;
+        var selectedLayers = comp.selectedLayers;
     if (selectedLayers.length > 0) {
         // Iterate through the selected layers
         for (var i = 0; i < selectedLayers.length; i++) {
@@ -23,6 +26,8 @@ if (app.project.activeItem instanceof CompItem) {
                     // Rename the duplicated layer
                     duplicatedLayer.name = originalLayer.name + " - Group " + j;
                 }
+                // Turn off visibility of the original layer
+                originalLayer.enabled = false;
             }
         }
     } else {
@@ -31,3 +36,6 @@ if (app.project.activeItem instanceof CompItem) {
 } else {
     alert("Please open a composition in Adobe After Effects.");
 }
+
+    app.endUndoGroup();
+})();
