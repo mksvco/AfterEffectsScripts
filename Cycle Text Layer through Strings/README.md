@@ -59,6 +59,5 @@ Kill him!
 ```
 First Layer Text	Second Layer Text
 Hello there!	General Kenobi.
-You are	a bold one.
-Execute	Order 66.
+You are	a bold one.	Execute	Order 66.
 ```
