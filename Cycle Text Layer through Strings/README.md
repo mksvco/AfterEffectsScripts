@@ -1,10 +1,11 @@
 # Overview
-This collection includes two After Effects scripts for cycling through text from external files:
+This collection includes three After Effects scripts for cycling through text from external files:
 
 1. `Cycle Text Layer through Strings.jsx`: Cycles through lines of text from a .txt file, updating a single text layer.
 2. `Cycle Two Text Layers through Strings.jsx`: Cycles through tab-separated values from a .tsv file, updating two text layers simultaneously.
+3. `Cycle Three Text Layers through Strings.jsx`: Cycles through tab-separated values from a .tsv file, updating three text layers simultaneously.
 
-Both scripts use a Slider Control for adjusting the timing of text changes in real-time.
+All scripts use a Slider Control for adjusting the timing of text changes in real-time.
 
 # Features
 
@@ -23,6 +24,14 @@ Both scripts use a Slider Control for adjusting the timing of text changes in re
 - Maintains perfect synchronization between both text layers
 - Embeds file contents directly into layer expressions—no external dependencies
 
+## Three Text Layers Script (`Cycle Three Text Layers through Strings.jsx`)
+- Reads from a tab-separated values (.tsv) file
+- Updates three text layers simultaneously from three columns
+- First selected layer uses first column, second uses second, third uses third
+- Shares a single Frames Per Text slider for synchronized timing
+- Maintains perfect synchronization between all three text layers
+- Embeds file contents directly into layer expressions—no external dependencies
+
 # Usage
 
 ## Single Text Layer Script
@@ -39,10 +48,17 @@ Both scripts use a Slider Control for adjusting the timing of text changes in re
 4. When prompted, select your .tsv file containing tab-separated values
 5. Adjust the Frames Per Text slider on the first text layer to control timing
 
+## Three Text Layers Script
+1. Create or open a composition in After Effects
+2. Select THREE text layers (order matters - first selected gets first column, etc.)
+3. Go to File → Scripts → Run Script File… and choose `Cycle Three Text Layers through Strings.jsx`
+4. When prompted, select your .tsv file containing tab-separated values (three columns per row)
+5. Adjust the Frames Per Text slider on the first text layer to control timing
+
 # Notes
 - The expression loops endlessly through the lines.
-- Avoid extremely large .txt files (hundreds of thousands of characters) — AE expressions can slow down with very long embedded strings.
-- Edit your .txt file and re-run the script any time you want to refresh the list.
+- Avoid extremely large .txt/.tsv files (hundreds of thousands of characters) — AE expressions can slow down with very long embedded strings.
+- Edit your .txt/.tsv file and re-run the script any time you want to refresh the list.
 - For more control, you can easily add additional sliders (e.g., Start Offset, Random Order) to the same text layer.
 
 # Example Files
@@ -59,5 +75,13 @@ Kill him!
 ```
 First Layer Text	Second Layer Text
 Hello there!	General Kenobi.
-You are	a bold one.	Execute	Order 66.
+You are a bold one.	Execute Order 66.
+```
+
+## Three Text Layers (.tsv)
+```
+First Layer	Second Layer	Third Layer
+Hello	World	!
+One	Two	Three
+Apple	Banana	Cherry
 ```
