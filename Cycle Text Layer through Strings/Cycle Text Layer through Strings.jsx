@@ -3,7 +3,7 @@
     - You'll be prompted to choose a .txt file with one entry per line.
     - Script creates/ensures a "Frames Per Text" slider and wires the expression.
 
-    v8
+    v9
 */
 
 (function () {
@@ -127,40 +127,61 @@
         // Optional: name the layer for clarity if it was auto-created
         if (textLayer.name === "…") textLayer.name = "Cycling Text";
 
-        // Apply expressions to image layers if any were selected
+        // Image layer triggering: create Layer Controls on the null for each value found in the FIRST ROW
+        // and wire image opacities so the selected image is visible while its trigger value is on screen.
         if (imageLayers.length > 0) {
-            for (var il = 0; il < imageLayers.length; il++) {
-                var imgLayer = imageLayers[il];
-                var layerName = imgLayer.name;
-                
-                // Extract trigger value from name format: "trigger:value" or "trigger: value\nwith\nnewlines"
-                // Captures everything after "trigger:" to the end of the layer name
-                var triggerMatch = layerName.match(/trigger:\s*(.+)$/i);
-                var triggerValue = triggerMatch ? triggerMatch[1].trim() : "";
-                
-                if (!triggerValue) {
-                    alert("Image layer '" + layerName + "' doesn't follow 'trigger:value' naming. Skipping.");
-                    continue;
-                }
-                
-                // Escape backslashes and quotes for the expression
-                triggerValue = triggerValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-                
-                // Build expression for image layer opacity
-                var NL2 = String.fromCharCode(10);
-                var imgExprLines = [];
-                imgExprLines.push("// Auto-generated: show when first text layer matches trigger value");
-                imgExprLines.push("var textVal = thisComp.layer('" + textLayer.name.replace(/'/g, "\\'") + "').text.sourceText.toLowerCase();");
-                imgExprLines.push("var trigger = '" + triggerValue.toLowerCase() + "';");
-                imgExprLines.push("// Handle literal \\\\n sequences by converting to actual newlines");
-                imgExprLines.push("trigger = trigger.replace(/\\\\n/g, String.fromCharCode(10));");
-                imgExprLines.push("(textVal === trigger) ? 100 : 0;");
-                var imgExpr = imgExprLines.join(NL2);
-                
-                // Apply opacity expression
-                imgLayer.opacity.expression = imgExpr;
+            var firstRow = (rows.length > 0) ? rows[0] : "";
+            var triggerParts = firstRow.split('\t');
+            var triggers = [];
+            for (var t = 0; t < triggerParts.length; t++) {
+                var tv = triggerParts[t];
+                while (tv.length && (tv.charCodeAt(0) <= 32)) tv = tv.substring(1);
+                while (tv.length && (tv.charCodeAt(tv.length-1) <= 32)) tv = tv.substring(0, tv.length-1);
+                if (tv.length) triggers.push(tv);
             }
-            alert("Applied trigger expressions to " + imageLayers.length + " image layer(s).");
+
+            if (triggers.length === 0) {
+                alert('No trigger values found in first row; skipping image wiring.');
+            } else {
+                var ctrlFx = nullLayer.property('ADBE Effect Parade');
+                var layerControlNames = [];
+                for (var i = 0; i < triggers.length; i++) {
+                    var ctrlName = 'Image ' + (i+1);
+                    var lc = ctrlFx.addProperty('ADBE Layer Control');
+                    lc.name = ctrlName;
+                    layerControlNames.push(ctrlName);
+                    if (i < imageLayers.length) {
+                        try { lc.property(1).setValue(imageLayers[i].index); } catch (e) { }
+                    }
+                }
+
+                var escTriggers = [];
+                var layerCtrlExprParts = [];
+                for (var k = 0; k < triggers.length; k++) {
+                    var raw = triggers[k].replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    escTriggers.push("'" + raw.toLowerCase() + "'");
+                    layerCtrlExprParts.push("thisComp.layer('" + nullLayer.name.replace(/'/g, "\\'") + "').effect('" + layerControlNames[k].replace(/'/g, "\\'") + "')('Layer')");
+                }
+
+                var triggersArrayLiteral = '[' + escTriggers.join(',') + ']';
+                var layerCtrlsArrayLiteral = '[' + layerCtrlExprParts.join(',') + ']';
+
+                var imgExprLines = [];
+                imgExprLines.push("// Auto-generated: show when cycling text matches a trigger and this layer is the linked layer");
+                imgExprLines.push("var textVal = thisComp.layer('" + textLayer.name.replace(/'/g, "\\'") + "').text.sourceText.toString().toLowerCase();");
+                imgExprLines.push("var triggers = " + triggersArrayLiteral + ";");
+                imgExprLines.push("var linked = " + layerCtrlsArrayLiteral + ";");
+                imgExprLines.push("for (var ii = 0; ii < triggers.length; ii++) triggers[ii] = triggers[ii].replace(/\\\\n/g, String.fromCharCode(10));");
+                imgExprLines.push("for (var i = 0; i < triggers.length; i++) { if (textVal === triggers[i] && linked[i] == thisLayer) return 100; }");
+                imgExprLines.push("0;");
+                var commonImgExpr = imgExprLines.join(NL);
+
+                for (var il2 = 0; il2 < imageLayers.length; il2++) {
+                    try { imageLayers[il2].opacity.expression = commonImgExpr; } catch (e) { $.writeln(e); }
+                }
+
+                alert('Created ' + triggers.length + ' image controls and wired ' + imageLayers.length + ' image layer(s).');
+            }
         }
 
         // Basic sanity warning for *very* large inputs (AE expr length constraints vary)

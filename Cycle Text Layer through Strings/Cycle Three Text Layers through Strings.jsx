@@ -5,7 +5,7 @@
     - First selected layer uses first column, second uses second, third uses third.
 
 
-    v8
+    v9
 */
 
 (function () {
@@ -27,79 +27,12 @@
 
     for (var sl = 0; sl < comp.selectedLayers.length; sl++) {
         var layer = comp.selectedLayers[sl];
-        if (layer instanceof TextLayer) {
-            textCount++;
-            if (!textLayer1) textLayer1 = layer;
-            else if (!textLayer2) textLayer2 = layer;
-            else if (!textLayer3) textLayer3 = layer;
-        } else if (layer instanceof AVLayer && !(layer instanceof TextLayer)) {
-            imageLayers.push(layer);
-        }
-    }
-
-    if (textCount !== 3) {
-        alert("Please select exactly THREE text layers (optional: also select image layers for triggering).");
-        app.endUndoGroup();
-        return;
-    }
-
-    // Pick a .tsv file with tab-separated values
-    var file = File.openDialog("Select a TSV file (tab-separated values)", "*.tsv;*.txt");
-    if (!file) {
-        app.endUndoGroup();
-        return;
-    }
-
-    // Read file content safely
-    try {
-        file.encoding = "UTF-8";
-        if (!file.open("r")) throw new Error("Could not open file.");
-
-        var content = file.read();
-        file.close();
-
-        // Normalize line endings to \n
-        content = content.replace(/\r\n|\r|\n/g, "\n");
-
-        // Build a JS array literal of rows so the generated expression doesn't contain literal "\\n" escapes
-        var rows = content.split("\n");
-        var entryList = [];
-        var parsedStrings = [];  // For preview
-        for (var ri = 0; ri < rows.length; ri++) {
-            var r = rows[ri];
-            // Trim for preview
-            var trimmed = r;
-            while (trimmed.length && (trimmed.charCodeAt(0) <= 32)) trimmed = trimmed.substring(1);
-            while (trimmed.length && (trimmed.charCodeAt(trimmed.length-1) <= 32)) trimmed = trimmed.substring(0, trimmed.length-1);
-            if (trimmed.length) parsedStrings.push(trimmed);
-            
-            r = r.replace(/\\/g, "\\\\").replace(/\"/g, '\\\"').replace(/"/g, '\\"');
-            entryList.push('"' + r + '"');
-        }
-        var entriesArrayLiteral = entryList.join(",");
-
-        // Show preview dialog with first 5 rows split by tab
-        var previewMsg = "Preview (first 5 entries):\n\n";
-        for (var pi = 0; pi < Math.min(5, parsedStrings.length); pi++) {
-            var parts = parsedStrings[pi].split("\t");
-            previewMsg += (pi + 1) + ". [" + (parts[0] || "(empty)") + "] | [" + (parts[1] || "(empty)") + "] | [" + (parts[2] || "(empty)") + "]\n";
-        }
-        if (parsedStrings.length > 5) {
-            previewMsg += "\n... and " + (parsedStrings.length - 5) + " more rows";
-        }
-        if (!confirm(previewMsg + "\n\nProceed with applying expressions?")) {
+        } catch (e) {
+            alert("Error: " + e.message);
+        } finally {
             app.endUndoGroup();
-            return;
         }
-
-        // Create a comp-level null object with the Frames Per Text slider
-        var nullLayer = comp.layers.addNull();
-        nullLayer.name = "Cycling Text Control";
-        var fx = nullLayer.property("ADBE Effect Parade");
-        var slider = fx.addProperty("ADBE Slider Control");
-        slider.name = "Frames Per Text";
-        slider.property("ADBE Slider Control-0001").setValue(10); // default
-
+    })();
     // Build expression for first column (use join with a real newline to avoid literal "\\n" sequences)
     var NL = String.fromCharCode(10);
     var exprLines1 = [];
@@ -172,35 +105,74 @@
         textLayer2.property("Source Text").expression = expr2;
         textLayer3.property("Source Text").expression = expr3;
 
-        // Image layer triggering based on first text layer values
+        // Image layer triggering: create Layer Controls on the null for each value found in the FIRST ROW
+        // and wire image opacities so the selected image is visible while its trigger value is on screen.
         if (imageLayers.length > 0) {
-            for (var il = 0; il < imageLayers.length; il++) {
-                var imgLayer = imageLayers[il];
-                var layerName = imgLayer.name;
-                
-                // Extract trigger value from layer name like "trigger:value" or "trigger: value\nwith\nnewlines"
-                // Captures everything after "trigger:" to the end of the layer name
-                var triggerMatch = layerName.match(/trigger:\s*(.+)$/i);
-                if (!triggerMatch) {
-                    // Skip layers without proper naming
-                    continue;
-                }
-                var triggerValue = triggerMatch[1].trim();
-                // Escape backslashes and quotes for the expression
-                triggerValue = triggerValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-                
-                // Build opacity expression: show when text content matches trigger (case-insensitive)
-                var imgExprLines = [];
-                imgExprLines.push("var textVal = thisComp.layer('" + textLayer1.name + "').text.sourceText.toLowerCase();");
-                imgExprLines.push("var trigger = '" + triggerValue.toLowerCase() + "';");
-                imgExprLines.push("// Handle literal \\\\n sequences by converting to actual newlines");
-                imgExprLines.push("trigger = trigger.replace(/\\\\n/g, String.fromCharCode(10));");
-                imgExprLines.push("(textVal === trigger) ? 100 : 0;");
-                var imgExpr = imgExprLines.join(NL);
-                
-                imgLayer.opacity.expression = imgExpr;
+            // Read the first row of the TSV and split into trigger values
+            var firstRow = (rows.length > 0) ? rows[0] : "";
+            var triggerParts = firstRow.split('\t');
+            var triggers = [];
+            for (var t = 0; t < triggerParts.length; t++) {
+                var tv = triggerParts[t];
+                // Trim
+                while (tv.length && (tv.charCodeAt(0) <= 32)) tv = tv.substring(1);
+                while (tv.length && (tv.charCodeAt(tv.length-1) <= 32)) tv = tv.substring(0, tv.length-1);
+                if (tv.length) triggers.push(tv);
             }
-            alert("Applied image layer triggers to " + imageLayers.length + " layer(s).");
+
+            if (triggers.length === 0) {
+                alert('No trigger values found in first row; skipping image wiring.');
+            } else {
+                // Create one Layer Control per trigger on the null so the user can pick/change images later
+                var ctrlFx = nullLayer.property('ADBE Effect Parade');
+                var layerControlNames = [];
+                for (var i = 0; i < triggers.length; i++) {
+                    var ctrlName = 'Image ' + (i+1);
+                    var lc = ctrlFx.addProperty('ADBE Layer Control');
+                    lc.name = ctrlName;
+                    layerControlNames.push(ctrlName);
+                    // If the user selected image layers, set a sensible default in order
+                    if (i < imageLayers.length) {
+                        try { lc.property(1).setValue(imageLayers[i].index); } catch (e) { /* ignore */ }
+                    }
+                }
+
+                // Build expression fragments: triggers array and layer-controls array
+                var escTriggers = [];
+                var layerCtrlExprParts = [];
+                for (var k = 0; k < triggers.length; k++) {
+                    // Escape backslashes and single quotes for embedding in single-quoted expression strings
+                    var raw = triggers[k].replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    escTriggers.push("'" + raw.toLowerCase() + "'");
+                    layerCtrlExprParts.push("thisComp.layer('" + nullLayer.name.replace(/'/g, "\\'") + "').effect('" + layerControlNames[k].replace(/'/g, "\\'") + "')('Layer')");
+                }
+
+                var triggersArrayLiteral = '[' + escTriggers.join(',') + ']';
+                var layerCtrlsArrayLiteral = '[' + layerCtrlExprParts.join(',') + ']';
+
+                // Expression applied to each selected image layer: show layer when its linked trigger is on screen
+                var imgExprLines = [];
+                imgExprLines.push("// Auto-generated: show when cycling text matches a trigger and this layer is the linked layer");
+                imgExprLines.push("var textVal = thisComp.layer('" + textLayer1.name.replace(/'/g, "\\'") + "').text.sourceText.toString().toLowerCase();");
+                imgExprLines.push("var triggers = " + triggersArrayLiteral + ";");
+                imgExprLines.push("var linked = " + layerCtrlsArrayLiteral + ";");
+                imgExprLines.push("// convert literal \\\\n+ sequences to actual newlines in triggers");
+                imgExprLines.push("for (var ii = 0; ii < triggers.length; ii++) triggers[ii] = triggers[ii].replace(/\\\\n/g, String.fromCharCode(10));");
+                imgExprLines.push("for (var i = 0; i < triggers.length; i++) { if (textVal === triggers[i] && linked[i] == thisLayer) return 100; }");
+                imgExprLines.push("0;");
+                var commonImgExpr = imgExprLines.join(NL);
+
+                // Apply the expression to each image layer the user selected (so mapping works even if they change layer links later)
+                for (var il2 = 0; il2 < imageLayers.length; il2++) {
+                    try {
+                        imageLayers[il2].opacity.expression = commonImgExpr;
+                    } catch (e) {
+                        $.writeln('Error applying opacity expr to ' + imageLayers[il2].name + ': ' + e);
+                    }
+                }
+
+                alert('Created ' + triggers.length + ' image controls and wired ' + imageLayers.length + ' image layer(s).');
+            }
         }
 
         // Optional: name the layers for clarity
@@ -215,6 +187,72 @@
     } catch (e) {
         alert("Error: " + e.message);
     } finally {
-        app.endUndoGroup();
-    }
-})();
+            // Image layer triggering: create Layer Controls on the null for each value found in the FIRST ROW
+            // and wire image opacities so the selected image is visible while its trigger value is on screen.
+            if (imageLayers.length > 0) {
+                // Read the first row of the TSV and split into trigger values
+                var firstRow = (rows.length > 0) ? rows[0] : "";
+                var triggerParts = firstRow.split('\t');
+                var triggers = [];
+                for (var t = 0; t < triggerParts.length; t++) {
+                    var tv = triggerParts[t];
+                    // Trim
+                    while (tv.length && (tv.charCodeAt(0) <= 32)) tv = tv.substring(1);
+                    while (tv.length && (tv.charCodeAt(tv.length-1) <= 32)) tv = tv.substring(0, tv.length-1);
+                    if (tv.length) triggers.push(tv);
+                }
+
+                if (triggers.length === 0) {
+                    alert('No trigger values found in first row; skipping image wiring.');
+                } else {
+                    // Create one Layer Control per trigger on the null so the user can pick/change images later
+                    var ctrlFx = nullLayer.property('ADBE Effect Parade');
+                    var layerControlNames = [];
+                    for (var i = 0; i < triggers.length; i++) {
+                        var ctrlName = 'Image ' + (i+1);
+                        var lc = ctrlFx.addProperty('ADBE Layer Control');
+                        lc.name = ctrlName;
+                        layerControlNames.push(ctrlName);
+                        // If the user selected image layers, set a sensible default in order
+                        if (i < imageLayers.length) {
+                            try { lc.property(1).setValue(imageLayers[i].index); } catch (e) { /* ignore */ }
+                        }
+                    }
+
+                    // Build expression fragments: triggers array and layer-controls array
+                    var escTriggers = [];
+                    var layerCtrlExprParts = [];
+                    for (var k = 0; k < triggers.length; k++) {
+                        // Escape backslashes and single quotes for embedding in single-quoted expression strings
+                        var raw = triggers[k].replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                        escTriggers.push("'" + raw.toLowerCase() + "'");
+                        layerCtrlExprParts.push("thisComp.layer('" + nullLayer.name.replace(/'/g, "\\'") + "').effect('" + layerControlNames[k].replace(/'/g, "\\'") + "')('Layer')");
+                    }
+
+                    var triggersArrayLiteral = '[' + escTriggers.join(',') + ']';
+                    var layerCtrlsArrayLiteral = '[' + layerCtrlExprParts.join(',') + ']';
+
+                    // Expression applied to each selected image layer: show layer when its linked trigger is on screen
+                    var imgExprLines = [];
+                    imgExprLines.push("// Auto-generated: show when cycling text matches a trigger and this layer is the linked layer");
+                    imgExprLines.push("var textVal = thisComp.layer('" + textLayer1.name.replace(/'/g, "\\'") + "').text.sourceText.toString().toLowerCase();");
+                    imgExprLines.push("var triggers = " + triggersArrayLiteral + ";");
+                    imgExprLines.push("var linked = " + layerCtrlsArrayLiteral + ";");
+                    imgExprLines.push("// convert literal \\\\n+ sequences to actual newlines in triggers");
+                    imgExprLines.push("for (var ii = 0; ii < triggers.length; ii++) triggers[ii] = triggers[ii].replace(/\\\\n/g, String.fromCharCode(10));");
+                    imgExprLines.push("for (var i = 0; i < triggers.length; i++) { if (textVal === triggers[i] && linked[i] == thisLayer) return 100; }");
+                    imgExprLines.push("0;");
+                    var commonImgExpr = imgExprLines.join(NL);
+
+                    // Apply the expression to each image layer the user selected (so mapping works even if they change layer links later)
+                    for (var il2 = 0; il2 < imageLayers.length; il2++) {
+                        try {
+                            imageLayers[il2].opacity.expression = commonImgExpr;
+                        } catch (e) {
+                            $.writeln('Error applying opacity expr to ' + imageLayers[il2].name + ': ' + e);
+                        }
+                    }
+
+                    alert('Created ' + triggers.length + ' image controls and wired ' + imageLayers.length + ' image layer(s).');
+                }
+            }
