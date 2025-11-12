@@ -16,9 +16,22 @@
 
     // Target text layer: use selected TextLayer or create a new one
     var textLayer;
-    if (comp.selectedLayers.length && comp.selectedLayers[0] instanceof TextLayer) {
-        textLayer = comp.selectedLayers[0];
-    } else {
+    var imageLayers = [];  // Collect image layers from selection
+    
+    if (comp.selectedLayers.length) {
+        // Separate text layers from image layers
+        for (var sl = 0; sl < comp.selectedLayers.length; sl++) {
+            var layer = comp.selectedLayers[sl];
+            if (layer instanceof TextLayer) {
+                if (!textLayer) textLayer = layer;  // Use first text layer
+            } else if (layer instanceof AVLayer && !(layer instanceof TextLayer)) {
+                // This is an image/solid layer
+                imageLayers.push(layer);
+            }
+        }
+    }
+    
+    if (!textLayer) {
         textLayer = comp.layers.addText("…");
     }
 
@@ -111,6 +124,37 @@
 
         // Optional: name the layer for clarity if it was auto-created
         if (textLayer.name === "…") textLayer.name = "Cycling Text";
+
+        // Apply expressions to image layers if any were selected
+        if (imageLayers.length > 0) {
+            for (var il = 0; il < imageLayers.length; il++) {
+                var imgLayer = imageLayers[il];
+                var layerName = imgLayer.name;
+                
+                // Extract trigger value from name format: "trigger:value"
+                var triggerMatch = layerName.match(/trigger:\s*(.+?)(?:\s|$)/i);
+                var triggerValue = triggerMatch ? triggerMatch[1].trim() : "";
+                
+                if (!triggerValue) {
+                    alert("Image layer '" + layerName + "' doesn't follow 'trigger:value' naming. Skipping.");
+                    continue;
+                }
+                
+                // Build expression for image layer opacity
+                var NL2 = String.fromCharCode(10);
+                var imgExprLines = [];
+                imgExprLines.push("// Auto-generated: show when first text layer matches trigger value");
+                imgExprLines.push("var triggerVal = '" + triggerValue.replace(/'/g, "\\'") + "';");
+                imgExprLines.push("var textVal = thisComp.layer('" + textLayer.name.replace(/'/g, "\\'") + "').text.sourceText;");
+                imgExprLines.push("// Compare case-insensitive");
+                imgExprLines.push("(textVal.toLowerCase() === triggerVal.toLowerCase()) ? 100 : 0;");
+                var imgExpr = imgExprLines.join(NL2);
+                
+                // Apply opacity expression
+                imgLayer.opacity.expression = imgExpr;
+            }
+            alert("Applied trigger expressions to " + imageLayers.length + " image layer(s).");
+        }
 
         // Basic sanity warning for *very* large inputs (AE expr length constraints vary)
         if (content.length > 200000) {

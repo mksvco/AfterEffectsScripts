@@ -18,19 +18,30 @@
         return;
     }
 
-    // Target text layers: need exactly three selected TextLayers
-    if (comp.selectedLayers.length !== 3 || 
-        !(comp.selectedLayers[0] instanceof TextLayer) || 
-        !(comp.selectedLayers[1] instanceof TextLayer) ||
-        !(comp.selectedLayers[2] instanceof TextLayer)) {
-        alert("Please select exactly THREE text layers.");
+    // Target text layers: need exactly three selected TextLayers, plus optional image layers
+    var textLayer1 = null;
+    var textLayer2 = null;
+    var textLayer3 = null;
+    var imageLayers = [];
+    var textCount = 0;
+
+    for (var sl = 0; sl < comp.selectedLayers.length; sl++) {
+        var layer = comp.selectedLayers[sl];
+        if (layer instanceof TextLayer) {
+            textCount++;
+            if (!textLayer1) textLayer1 = layer;
+            else if (!textLayer2) textLayer2 = layer;
+            else if (!textLayer3) textLayer3 = layer;
+        } else if (layer instanceof AVLayer && !(layer instanceof TextLayer)) {
+            imageLayers.push(layer);
+        }
+    }
+
+    if (textCount !== 3) {
+        alert("Please select exactly THREE text layers (optional: also select image layers for triggering).");
         app.endUndoGroup();
         return;
     }
-
-    var textLayer1 = comp.selectedLayers[0];
-    var textLayer2 = comp.selectedLayers[1];
-    var textLayer3 = comp.selectedLayers[2];
 
     // Pick a .tsv file with tab-separated values
     var file = File.openDialog("Select a TSV file (tab-separated values)", "*.tsv;*.txt");
@@ -160,6 +171,32 @@
         textLayer1.property("Source Text").expression = expr1;
         textLayer2.property("Source Text").expression = expr2;
         textLayer3.property("Source Text").expression = expr3;
+
+        // Image layer triggering based on first text layer values
+        if (imageLayers.length > 0) {
+            for (var il = 0; il < imageLayers.length; il++) {
+                var imgLayer = imageLayers[il];
+                var layerName = imgLayer.name;
+                
+                // Extract trigger value from layer name like "trigger:value"
+                var triggerMatch = layerName.match(/trigger:\s*(.+?)(?:\s|$)/i);
+                if (!triggerMatch) {
+                    // Skip layers without proper naming
+                    continue;
+                }
+                var triggerValue = triggerMatch[1].trim();
+                
+                // Build opacity expression: show when text content matches trigger (case-insensitive)
+                var imgExprLines = [];
+                imgExprLines.push("var textVal = thisComp.layer('" + textLayer1.name + "').text.sourceText.toLowerCase();");
+                imgExprLines.push("var trigger = '" + triggerValue.toLowerCase() + "';");
+                imgExprLines.push("(textVal === trigger) ? 100 : 0;");
+                var imgExpr = imgExprLines.join(NL);
+                
+                imgLayer.opacity.expression = imgExpr;
+            }
+            alert("Applied image layer triggers to " + imageLayers.length + " layer(s).");
+        }
 
         // Optional: name the layers for clarity
         if (textLayer1.name === "…") textLayer1.name = "Cycling Text 1";

@@ -62,6 +62,42 @@ All scripts use a Slider Control for adjusting the timing of text changes in rea
 - For more control, you can easily add additional sliders (e.g., Start Offset, Random Order) to the same text layer.
 - **Line Breaks**: Use literal `\n` in your text entries to create multi-line text. For example, `Hello\nWorld` will display as two lines: "Hello" on the first line, "World" on the second.
 
+# Image Layer Triggering
+
+All three scripts support automatic triggering of image/solid layers based on text content. When a text layer displays a specific value, corresponding image layers automatically become visible.
+
+## How It Works
+1. Name your image or solid layers using the pattern: `trigger:value`
+   - Example: `trigger:header`, `trigger:special`, `trigger:intro`
+   - The part after `trigger:` is the value that will be matched against text content
+2. Select your text layer(s) AND the image/solid layers you want to trigger
+3. Run the script as normal
+4. The script automatically applies opacity expressions to the image layers
+5. When the text layer shows the matching value, the image layer's opacity will be 100% (visible)
+6. When the text layer shows a different value, the image layer's opacity will be 0% (hidden)
+
+## Example Workflow
+
+### Composition Setup
+- `Text Layer 1` (cycling through values)
+- `trigger:Scene1` (image or solid layer)
+- `trigger:Scene2` (image or solid layer)
+- `trigger:Intro` (image or solid layer)
+
+### Data File (.tsv for multi-layer) or (.txt for single-layer)
+```
+Scene1
+Intro
+Scene2
+```
+
+### Result
+- When Text Layer 1 shows "Scene1", only the `trigger:Scene1` layer is visible
+- When Text Layer 1 shows "Intro", only the `trigger:Intro` layer is visible
+- When Text Layer 1 shows "Scene2", only the `trigger:Scene2` layer is visible
+
+**Note:** Trigger matching is case-insensitive, so `trigger:hello` will match text values of "Hello", "HELLO", "hello", etc.
+
 # Line Break Examples
 
 ## Single Text Layer with Line Breaks
