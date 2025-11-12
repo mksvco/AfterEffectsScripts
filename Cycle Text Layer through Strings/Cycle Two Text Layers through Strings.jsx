@@ -153,18 +153,23 @@
                 var imgLayer = imageLayers[il];
                 var layerName = imgLayer.name;
                 
-                // Extract trigger value from layer name like "trigger:value"
-                var triggerMatch = layerName.match(/trigger:\s*(.+?)(?:\s|$)/i);
+                // Extract trigger value from layer name like "trigger:value" or "trigger: value\nwith\nnewlines"
+                // Captures everything after "trigger:" to the end of the layer name
+                var triggerMatch = layerName.match(/trigger:\s*(.+)$/i);
                 if (!triggerMatch) {
                     // Skip layers without proper naming
                     continue;
                 }
                 var triggerValue = triggerMatch[1].trim();
+                // Escape backslashes and quotes for the expression
+                triggerValue = triggerValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
                 
                 // Build opacity expression: show when text content matches trigger (case-insensitive)
                 var imgExprLines = [];
                 imgExprLines.push("var textVal = thisComp.layer('" + textLayer1.name + "').text.sourceText.toLowerCase();");
                 imgExprLines.push("var trigger = '" + triggerValue.toLowerCase() + "';");
+                imgExprLines.push("// Handle literal \\\\n sequences by converting to actual newlines");
+                imgExprLines.push("trigger = trigger.replace(/\\\\n/g, String.fromCharCode(10));");
                 imgExprLines.push("(textVal === trigger) ? 100 : 0;");
                 var imgExpr = imgExprLines.join(NL);
                 

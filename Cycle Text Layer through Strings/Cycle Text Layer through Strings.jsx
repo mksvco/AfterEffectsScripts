@@ -131,8 +131,9 @@
                 var imgLayer = imageLayers[il];
                 var layerName = imgLayer.name;
                 
-                // Extract trigger value from name format: "trigger:value"
-                var triggerMatch = layerName.match(/trigger:\s*(.+?)(?:\s|$)/i);
+                // Extract trigger value from name format: "trigger:value" or "trigger: value\nwith\nnewlines"
+                // Captures everything after "trigger:" to the end of the layer name
+                var triggerMatch = layerName.match(/trigger:\s*(.+)$/i);
                 var triggerValue = triggerMatch ? triggerMatch[1].trim() : "";
                 
                 if (!triggerValue) {
@@ -140,14 +141,18 @@
                     continue;
                 }
                 
+                // Escape backslashes and quotes for the expression
+                triggerValue = triggerValue.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+                
                 // Build expression for image layer opacity
                 var NL2 = String.fromCharCode(10);
                 var imgExprLines = [];
                 imgExprLines.push("// Auto-generated: show when first text layer matches trigger value");
-                imgExprLines.push("var triggerVal = '" + triggerValue.replace(/'/g, "\\'") + "';");
-                imgExprLines.push("var textVal = thisComp.layer('" + textLayer.name.replace(/'/g, "\\'") + "').text.sourceText;");
-                imgExprLines.push("// Compare case-insensitive");
-                imgExprLines.push("(textVal.toLowerCase() === triggerVal.toLowerCase()) ? 100 : 0;");
+                imgExprLines.push("var textVal = thisComp.layer('" + textLayer.name.replace(/'/g, "\\'") + "').text.sourceText.toLowerCase();");
+                imgExprLines.push("var trigger = '" + triggerValue.toLowerCase() + "';");
+                imgExprLines.push("// Handle literal \\\\n sequences by converting to actual newlines");
+                imgExprLines.push("trigger = trigger.replace(/\\\\n/g, String.fromCharCode(10));");
+                imgExprLines.push("(textVal === trigger) ? 100 : 0;");
                 var imgExpr = imgExprLines.join(NL2);
                 
                 // Apply opacity expression
