@@ -1,7 +1,9 @@
 /*  Cycle Text From .TXT (frames linked to slider)
     - Select a comp (and a text layer if you already have one), then run.
-    - You’ll be prompted to choose a .txt file with one entry per line.
+    - You'll be prompted to choose a .txt file with one entry per line.
     - Script creates/ensures a "Frames Per Text" slider and wires the expression.
+
+    v8
 */
 
 (function () {

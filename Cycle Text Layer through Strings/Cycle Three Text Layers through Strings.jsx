@@ -5,7 +5,7 @@
     - First selected layer uses first column, second uses second, third uses third.
 
 
-    v7
+    v8
 */
 
 (function () {

@@ -3,6 +3,8 @@
     - You'll be prompted to choose a .tsv file with tab-separated values.
     - Script creates/ensures a "Frames Per Text" slider and wires the expressions.
     - First selected layer uses first column, second selected layer uses second column.
+
+    v8
 */
 
 (function () {
