@@ -60,6 +60,24 @@ All scripts use a Slider Control for adjusting the timing of text changes in rea
 - Avoid extremely large .txt/.tsv files (hundreds of thousands of characters) — AE expressions can slow down with very long embedded strings.
 - Edit your .txt/.tsv file and re-run the script any time you want to refresh the list.
 - For more control, you can easily add additional sliders (e.g., Start Offset, Random Order) to the same text layer.
+- **Line Breaks**: Use literal `\n` in your text entries to create multi-line text. For example, `Hello\nWorld` will display as two lines: "Hello" on the first line, "World" on the second.
+
+# Line Break Examples
+
+## Single Text Layer with Line Breaks
+```
+Line 1
+Multi\nLine\nText
+Another\nEntry
+```
+Result: The second entry will display as three lines in After Effects.
+
+## Multi-Column with Line Breaks
+```
+Col 1 Text	Col 2\nLine 2
+Row 2\nPart A	Part B\nLine 2
+```
+Both columns support `\n` for multi-line text independently.
 
 # Example Files
 
